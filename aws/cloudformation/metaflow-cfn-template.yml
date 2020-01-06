@@ -5,40 +5,41 @@ Parameters:
   SagemakerInstance: 
     Type: String
     Default: ml.t2.xlarge
-    AllowedValues: ['ml.t2.large','ml.t2.xlarge','ml.t2.2xlarge']
+    AllowedValues: ['ml.t2.medium','ml.t2.large','ml.t2.xlarge','ml.t2.2xlarge','ml.t3.medium','ml.t3.large','ml.t3.xlarge','ml.t3.2xlarge']
     Description: 'Instance type for Sagemaker Notebook.'
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: 'Metaflow VPC'
   VPCCidr: 
     Type: String
-    Default: 10.20.0.0/16
-    Description: 'CIDR for the Metaflow VPC'
-  Subnet1Cidr: 
-    Type: String
-    Default: 10.20.0.0/24
-    Description: 'CIDR for Metaflow VPC Subnet 1'
-  Subnet2Cidr: 
-    Type: String
-    Default: 10.20.1.0/24
-    Description: 'CIDR for Metaflow VPC Subnet 2'
+    Default: 10.97.0.0/16
+    Description: 'CIDR for the VPC'
+  Subnet1:
+    Type: AWS::EC2::Subnet::Id
+    Description: 'Metaflow Subnet 1'
+  Subnet2:
+    Type: AWS::EC2::Subnet::Id
+    Description: 'Metaflow Subnet 2'
   MaxVCPUBatch: 
     Type: Number
     Default: 64
-    AllowedValues: [16,32,64,96]
-    MinValue: 16
+    AllowedValues: [2,4,8,16,32,64,96]
+    MinValue: 2
     MaxValue: 96
     Description: 'Maximum VCPUs for Batch Compute Environment [16-96]'
   MinVCPUBatch: 
     Type: Number
     Default: 8
-    MinValue: 2
+    MinValue: 0
     MaxValue: 16
-    AllowedValues: [2,4,8,16]
+    AllowedValues: [0,2,4,8,16]
     Description: 'Maximum VCPUs for Batch Compute Environment [2-16]'
   DesiredVCPUBatch: 
     Type: Number
     Default: 8
-    MinValue: 2
+    MinValue: 1
     MaxValue: 16
-    AllowedValues: [2,4,8,16]
+    AllowedValues: [1,2,4,8,16]
     Description: 'Desired Starting VCPUs for Batch Compute Environment [2-16]'
   CustomRole:
     Type: String
@@ -77,60 +78,6 @@ Conditions:
   EnableAuth: !Equals [ !Ref APIBasicAuth, 'true']
   EnableRole: !Equals [ !Ref CustomRole, 'true']
 Resources:
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      CidrBlock: !Ref VPCCidr
-  Subnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone:
-         Fn::Select:
-         - 0
-         - Fn::GetAZs: {Ref: 'AWS::Region'}
-      VpcId: !Ref 'VPC'
-      CidrBlock: !Ref Subnet1Cidr
-      MapPublicIpOnLaunch: true
-  Subnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      AvailabilityZone:
-         Fn::Select:
-         - 1
-         - Fn::GetAZs: {Ref: 'AWS::Region'}
-      VpcId: !Ref 'VPC'
-      CidrBlock: !Ref Subnet2Cidr
-      MapPublicIpOnLaunch: true
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-  GatewayAttachement:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref 'VPC'
-      InternetGatewayId: !Ref 'InternetGateway'
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref 'VPC'
-  DefaultGateway:
-    Type: AWS::EC2::Route
-    DependsOn: GatewayAttachement
-    Properties:
-      RouteTableId: !Ref 'PublicRouteTable'
-      DestinationCidrBlock: '0.0.0.0/0'
-      GatewayId: !Ref 'InternetGateway'
-  Subnet1RTA:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref Subnet1
-      RouteTableId: !Ref PublicRouteTable
-  Subnet2RTA:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref Subnet2
-      RouteTableId: !Ref PublicRouteTable
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
@@ -150,7 +97,7 @@ Resources:
       IpProtocol: tcp
       FromPort: 8080
       ToPort: 8080
-      CidrIp: !GetAtt 'VPC.CidrBlock'
+      CidrIp: !Ref 'VPCCidr'
   FargateInternalRule:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
